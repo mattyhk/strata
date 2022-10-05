@@ -75,6 +75,25 @@ pub fn handler(ctx: Context<BuyNativeV0>, args: BuyV0Args) -> Result<()> {
     )?;
   }
 
+  if referral_royalties > 0 {
+    let referral_royalties_account = ctx
+      .accounts
+      .common
+      .referral_royalties
+      .clone()
+      .to_account_info();
+
+    msg!("Paying out {} referral royalties", referral_royalties);
+    invoke(
+      &system_instruction::transfer(&source.key(), &referral_royalties_account.key(), referral_royalties),
+      &[
+        source.to_account_info().clone(),
+        referral_royalties_account.to_account_info().clone(),
+        ctx.accounts.system_program.to_account_info().clone(),
+      ],
+    )?;
+  }
+
   // msg!("Paying out {} to base storage", price);
   buy_wrapped_sol(
     &BuyWrappedSolV0 {

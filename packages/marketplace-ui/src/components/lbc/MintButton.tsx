@@ -65,6 +65,7 @@ export interface IMintArgs {
   tokenBondingSdk: SplTokenBonding | undefined;
   tokenBonding: PublicKey | undefined;
   maxPrice: number;
+  referralCode: string | undefined;
 }
 
 export const MintButton = ({

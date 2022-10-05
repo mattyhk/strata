@@ -10,6 +10,7 @@ pub struct BuyAmount {
   pub total_amount: u64,
   pub base_royalties: u64,
   pub target_royalties: u64,
+  pub referral_royalties: u64,
 }
 
 pub fn buy_shared_logic(common: &mut BuyCommonV0, args: &BuyV0Args) -> Result<BuyAmount> {
