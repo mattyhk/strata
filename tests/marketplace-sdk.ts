@@ -2,11 +2,11 @@ import * as anchor from "@project-serum/anchor";
 import { Keypair } from "@solana/web3.js";
 import { expect, use } from "chai";
 import ChaiAsPromised from "chai-as-promised";
-import { MarketplaceSdk } from "../packages/marketplace-sdk/src";
+import { MarketplaceSdk } from "@strata-foundation/marketplace-sdk";
 import {
   ExponentialCurveConfig,
   SplTokenBonding,
-} from "../packages/spl-token-bonding/src";
+} from "@strata-foundation/spl-token-bonding";
 import { TokenUtils } from "./utils/token";
 import {
   createMint,
@@ -63,6 +63,47 @@ describe("marketplace-sdk", () => {
   it("allows creation of an lbc", async () => {
     const { targetMint, tokenBonding } =
       await marketplaceSdk.createLiquidityBootstrapper({
+        authority: me,
+        metadata: new DataV2({
+          // Max name len 32
+          name: "test",
+          symbol: "test",
+          uri: "",
+          sellerFeeBasisPoints: 0,
+          creators: null,
+          collection: null,
+          uses: null,
+        }),
+        baseMint: NATIVE_MINT,
+        startPrice: 5,
+        minPrice: 0.5,
+        interval: 2,
+        maxSupply: 100,
+        bondingArgs: {
+          targetMintDecimals: 9,
+        },
+      });
+    const tokenBondingAcct = (await tokenBondingProgram.getTokenBonding(
+      tokenBonding
+    ))!;
+    await waitForUnixTime(
+      provider.connection,
+      BigInt(tokenBondingAcct.goLiveUnixTime.toNumber() + 2)
+    );
+    const { targetAmount } = await tokenBondingProgram.swap({
+      baseMint: NATIVE_MINT,
+      targetMint,
+      baseAmount: 1,
+      slippage: 0.01,
+    });
+    // Price should shift slightly because k = 1 at this point
+    expect(targetAmount).to.eq(1.990098768);
+  });
+
+  // This test was created because with msg! enabled, we were blowing compute.
+  it("can sell the full supply with no issues", async () => {
+    const { targetMint, tokenBonding } =
+      await marketplaceSdk.createLiquidityBootstrapper({
         iAmAFreeloader: true,
         authority: me,
         metadata: new DataV2({
@@ -92,15 +133,64 @@ describe("marketplace-sdk", () => {
       BigInt(tokenBondingAcct.goLiveUnixTime.toNumber() + 2)
     );
     for (let i = 0; i < 25; i++) {
-      console.log("BUYING TOKEN");
       await tokenBondingProgram.buy({
         tokenBonding,
         desiredTargetAmount: 1,
         slippage: 0.05,
-        referralCode: "HELLO"
       });
     }
   });
 
-  
+  it("allows selling an initial supply of tokens", async () => {
+    const curve = await tokenBondingProgram.initializeCurve({
+      config: new ExponentialCurveConfig({
+        b: 1,
+        c: 0,
+        pow: 0,
+        frac: 1,
+      }),
+    });
+    const mint = await createMint(provider, me, 0);
+    await createAtaAndMint(provider, mint, 50);
+    const { offer, retrieval } =
+      await marketplaceSdk.createTokenBondingForSetSupply({
+        fixedCurve: curve,
+        curve,
+        supplyMint: mint,
+        supplyAmount: 50,
+        baseMint: NATIVE_MINT,
+        buyBaseRoyaltyPercentage: 0,
+        sellBaseRoyaltyPercentage: 0,
+        buyTargetRoyaltyPercentage: 0,
+        sellTargetRoyaltyPercentage: 0,
+      });
+
+    await tokenUtils.expectAtaBalance(me, mint, 0);
+
+    await tokenBondingProgram.buy({
+      desiredTargetAmount: 25,
+      tokenBonding: offer.tokenBonding,
+      slippage: 0.05,
+    });
+    await marketplaceSdk.fungibleEntanglerSdk.swapChildForParent({
+      amount: 25,
+      parentEntangler: retrieval.parentEntangler,
+      childEntangler: retrieval.childEntangler,
+    });
+
+    await tokenUtils.expectAtaBalance(me, mint, 25);
+
+    await tokenBondingProgram.buy({
+      desiredTargetAmount: 25,
+      tokenBonding: offer.tokenBonding,
+      slippage: 0.05,
+    });
+    await marketplaceSdk.fungibleEntanglerSdk.swapChildForParent({
+      amount: 25,
+      parentEntangler: retrieval.parentEntangler,
+      childEntangler: retrieval.childEntangler,
+    });
+
+    await tokenUtils.expectAtaBalance(me, mint, 50);
+  });
 });

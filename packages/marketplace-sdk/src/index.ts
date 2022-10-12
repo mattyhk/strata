@@ -1074,7 +1074,6 @@ export class MarketplaceSdk {
   }: ICreateLiquidityBootstrapperArgs): Promise<
     BigInstructionResult<{ tokenBonding: PublicKey; targetMint: PublicKey }>
   > {
-    console.log("MODIFIED PACKAGE")
     if (protocolFee == 0 && !iAmAFreeloader) {
       throw new Error(
         "Must use `iAmAFreeloader` flag when setting protocolFee"

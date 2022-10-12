@@ -30,8 +30,6 @@ export interface CollectionData {
   candyMachine: anchor.web3.PublicKey
 }
 
-const REFERRAL_FEE = 0.15
-
 export const awaitTransactionSignatureConfirmation = async (
   txid: anchor.web3.TransactionSignature,
   timeout: number,
@@ -197,7 +195,7 @@ export const getCollectionAuthorityRecordPDA = async (
 export const mintOneToken = async (
   candyMachine: ICandyMachine,
   payer: anchor.web3.PublicKey,
-  { tokenBondingSdk, tokenBonding, maxPrice, referralCode }: IMintArgs
+  { tokenBondingSdk, tokenBonding, maxPrice }: IMintArgs
 ): Promise<PublicKey> => {
   if (!tokenBondingSdk) {
     throw new Error("No bonding sdk")
@@ -223,39 +221,19 @@ export const mintOneToken = async (
 
   let bondingInstructions: TransactionInstruction[] = []
   let bondingSigners: Signer[] = []
-
   if (tokenBonding && (ataBalance || 0) < 1) {
     console.log("Buying bonding curve...", ataBalance)
     if (isNaN(maxPrice)) {
       throw new Error("Invalid slippage");
     }
-
-    if (referralCode) {
-      // need to update logic with getting destination address
-      const referralDestination = payer;
-
-      const { instructions: bondInstrs, signers: bondSigners } = await tokenBondingSdk.buyInstructions({
-        tokenBonding,
-        desiredTargetAmount: 1,
-        expectedBaseAmount: maxPrice,
-        slippage: 0,
-        referralDestination: referralDestination
-      })
-      bondingInstructions.push(...bondInstrs)
-      bondingSigners.push(...bondSigners)
-
-    } else {
-      const { instructions: bondInstrs, signers: bondSigners } = await tokenBondingSdk.buyInstructions({
-        tokenBonding,
-        desiredTargetAmount: 1,
-        expectedBaseAmount: maxPrice,
-        slippage: 0,
-      })
-      bondingInstructions.push(...bondInstrs)
-      bondingSigners.push(...bondSigners)
-    }
-
-    
+    const { instructions: bondInstrs, signers: bondSigners } = await tokenBondingSdk.buyInstructions({
+      tokenBonding,
+      desiredTargetAmount: 1,
+      expectedBaseAmount: maxPrice,
+      slippage: 0,
+    })
+    bondingInstructions.push(...bondInstrs)
+    bondingSigners.push(...bondSigners)
   }
 
   instructions.push(

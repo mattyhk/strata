@@ -474,8 +474,6 @@ export interface IBuyArgs {
   expectedBaseAmount?: BN | number;
   /** Decimal number. max price will be (1 + slippage) * price_for_desired_target_amount */
   slippage: number;
-  /** An account to send referral royalties. **Default:** None */
-  referralDestination?: PublicKey;
 }
 
 /** DEPRECATED. Will be removed in a future version */
@@ -1692,9 +1690,7 @@ export class SplTokenBonding extends AnchorSdk<SplTokenBondingIDL> {
     expectedBaseAmount,
     slippage,
     payer = this.wallet.publicKey,
-    referralDestination
   }: IBuyArgs): Promise<InstructionResult<null>> {
-    console.log("Modified Buy Instructions");
     const state = (await this.getState())!;
     const tokenBondingAcct = (await this.getTokenBonding(tokenBonding))!;
     const isNative =
@@ -1856,10 +1852,6 @@ export class SplTokenBonding extends AnchorSdk<SplTokenBondingIDL> {
       destination,
     };
 
-    if (referralDestination) {
-      common["referralDestination"] = referralDestination;
-    }
-
     if (isNative) {
       instructions.push(
         await this.instruction.buyNativeV0(args, {
@@ -1904,7 +1896,6 @@ export class SplTokenBonding extends AnchorSdk<SplTokenBondingIDL> {
     args: IBuyArgs,
     commitment: Commitment = "confirmed"
   ): Promise<void> {
-    console.log("Modified Buy");
     await this.execute(this.buyInstructions(args), args.payer, commitment);
   }
 
